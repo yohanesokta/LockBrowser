@@ -1,0 +1,3 @@
+venv
+g*.md
+*/__pycache__
