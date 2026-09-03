@@ -6,6 +6,7 @@ class TabManager(QObject):
     tabs_changed = Signal(list)
     current_tab_changed = Signal(int)
     url_changed = Signal(str)
+    load_progress = Signal(int)
 
     def __init__(self, stacked_widget: QStackedWidget):
         super().__init__()
@@ -40,6 +41,7 @@ class TabManager(QObject):
         view.urlChanged.connect(self.on_view_url_changed)
         view.titleChanged.connect(self.on_view_title_changed)
         view.iconChanged.connect(self.on_view_icon_changed)
+        view.loadProgress.connect(self.on_view_load_progress)
 
     def close_tab(self, index):
         if 0 <= index < len(self.tabs):
@@ -108,6 +110,11 @@ class TabManager(QObject):
 
     def on_view_icon_changed(self, icon):
         self.emit_tabs_changed()
+
+    def on_view_load_progress(self, progress):
+        view = self.sender()
+        if view == self.get_current_view():
+            self.load_progress.emit(progress)
 
     def emit_tabs_changed(self):
         result = []

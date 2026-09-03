@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QStackedWidget, QApplication
+    QStackedWidget, QApplication, QProgressBar
 )
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -9,6 +9,8 @@ from src.sidebar import Sidebar
 from src.tab_manager import TabManager
 from src.styles import MAIN_STYLE
 from src.url_popup import UrlPopup
+from src.dialogs import HistoryDialog, DownloadsDialog, ChangePasswordDialog
+from src.webview import get_persistent_profile
 
 class Browser(QMainWindow):
     def __init__(self):
@@ -18,6 +20,9 @@ class Browser(QMainWindow):
         self.setStyleSheet(MAIN_STYLE)
         
         self.setMouseTracking(True)
+
+        self.history_records = []
+        self.download_records = []
 
         self.central_widget = QWidget()
         self.central_widget.setObjectName("central_widget")
@@ -30,6 +35,14 @@ class Browser(QMainWindow):
 
         self.titlebar = TitleBar(self)
         self.main_layout.addWidget(self.titlebar)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setObjectName("loading_bar")
+        self.progress_bar.setFixedHeight(3)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.hide()
+        self.main_layout.addWidget(self.progress_bar)
 
         self.content_layout = QHBoxLayout()
         self.content_layout.setContentsMargins(0, 0, 0, 0)
@@ -52,11 +65,19 @@ class Browser(QMainWindow):
         self.sidebar.tab_changed.connect(self.tab_manager.set_current_tab)
         self.sidebar.new_tab.connect(self.tab_manager.add_tab)
         
+        self.sidebar.open_history.connect(self.show_history)
+        self.sidebar.open_downloads.connect(self.show_downloads)
+        self.sidebar.open_settings.connect(self.show_settings)
+
         self.url_popup.url_submitted.connect(self.tab_manager.load_url)
 
         self.tab_manager.tabs_changed.connect(self.sidebar.update_tabs)
         self.tab_manager.current_tab_changed.connect(self.sidebar.set_current_tab)
-        self.tab_manager.url_changed.connect(self.sidebar.url_bar.setText)
+        self.tab_manager.url_changed.connect(self.on_url_changed)
+        self.tab_manager.load_progress.connect(self.update_progress)
+
+        profile = get_persistent_profile()
+        profile.downloadRequested.connect(self.on_download_requested)
 
         self.tab_manager.add_tab()
         
@@ -65,6 +86,55 @@ class Browser(QMainWindow):
         self._resizing = False
         self._resize_edge = None
         self._margin = 5
+
+    def on_url_changed(self, url):
+        self.sidebar.url_bar.setText(url)
+        view = self.tab_manager.get_current_view()
+        title = view.title() if view else url
+        if url and url != "about:blank":
+            self.history_records.append({"title": title or url, "url": url})
+
+    def on_download_requested(self, item):
+        item.accept()
+        filename = item.downloadFileName()
+        record = {"filename": filename, "status": "Downloading..."}
+        self.download_records.append(record)
+        
+        def update_status():
+            if item.state() == item.DownloadFinished:
+                record["status"] = "Selesai"
+            elif item.state() == item.DownloadCancelled:
+                record["status"] = "Dibatalkan"
+            elif item.state() == item.DownloadInterrupted:
+                record["status"] = "Gagal"
+                
+        item.isFinishedChanged.connect(update_status)
+
+    def show_history(self):
+        dlg = HistoryDialog(self.history_records, self)
+        geo = self.geometry()
+        dlg.move(geo.x() + (geo.width() - dlg.width()) // 2, geo.y() + (geo.height() - dlg.height()) // 3)
+        dlg.exec()
+
+    def show_downloads(self):
+        dlg = DownloadsDialog(self.download_records, self)
+        geo = self.geometry()
+        dlg.move(geo.x() + (geo.width() - dlg.width()) // 2, geo.y() + (geo.height() - dlg.height()) // 3)
+        dlg.exec()
+
+    def show_settings(self):
+        dlg = ChangePasswordDialog(self)
+        geo = self.geometry()
+        dlg.move(geo.x() + (geo.width() - dlg.width()) // 2, geo.y() + (geo.height() - dlg.height()) // 3)
+        dlg.exec()
+
+    def update_progress(self, progress):
+        if progress < 100:
+            self.progress_bar.show()
+            self.progress_bar.setValue(progress)
+        else:
+            self.progress_bar.setValue(100)
+            self.progress_bar.hide()
 
     def setup_shortcuts(self):
         QShortcut(QKeySequence("Ctrl+T"), self, self.tab_manager.add_tab)
@@ -81,6 +151,8 @@ class Browser(QMainWindow):
         QShortcut(QKeySequence("Ctrl+B"), self, self.toggle_sidebar)
         
         QShortcut(QKeySequence("Ctrl+/"), self, self.open_url_popup)
+        QShortcut(QKeySequence("Ctrl+H"), self, self.show_history)
+        QShortcut(QKeySequence("Ctrl+J"), self, self.show_downloads)
         QShortcut(QKeySequence("Ctrl+("), self, lambda: self.tab_manager.split_current_tab(Qt.Horizontal))
         QShortcut(QKeySequence("Ctrl+)"), self, lambda: self.tab_manager.split_current_tab(Qt.Vertical))
 
@@ -109,7 +181,7 @@ class Browser(QMainWindow):
             self.showFullScreen()
 
     def toggle_sidebar(self):
-        self.sidebar.setVisible(not self.sidebar.isVisible())
+        self.sidebar.toggle_collapse()
 
     def get_edge(self, pos):
         x, y = pos.x(), pos.y()

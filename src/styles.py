@@ -42,12 +42,38 @@ QListWidget::item:selected {
 QListWidget::item:hover {
     background-color: rgba(255, 255, 255, 0.08);
 }
+QScrollBar:horizontal {
+    height: 0px;
+    background: transparent;
+}
+QScrollBar:vertical {
+    width: 4px;
+    background: transparent;
+}
+QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
 QSplitter::handle {
     background-color: rgba(255, 255, 255, 0.1);
     margin: 2px;
 }
 QSplitter::handle:hover {
     background-color: rgba(255, 255, 255, 0.3);
+}
+QProgressBar#loading_bar {
+    background-color: transparent;
+    border: none;
+}
+QProgressBar#loading_bar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #ff5f56,
+        stop:0.5 #ffbd2e,
+        stop:1 #27c93f);
+    border-radius: 1px;
 }
 """
 
