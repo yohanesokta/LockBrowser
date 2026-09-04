@@ -1,11 +1,48 @@
 import os
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings
+from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings, QWebEngineScript
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QAction
 from src.crypto_utils import get_runtime_profile_dir
 
-CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+CHROME_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+# JavaScript to spoof navigator properties so Google doesn't detect embedded browser
+SPOOF_JS = """
+(function() {
+    // Override userAgentData to mimic real Chrome
+    if (navigator.userAgentData === undefined || navigator.userAgentData) {
+        Object.defineProperty(navigator, 'userAgentData', {
+            get: function() {
+                return {
+                    brands: [
+                        {brand: "Google Chrome", version: "131"},
+                        {brand: "Chromium", version: "131"},
+                        {brand: "Not_A Brand", version: "24"}
+                    ],
+                    mobile: false,
+                    platform: "Linux",
+                    getHighEntropyValues: function(hints) {
+                        return Promise.resolve({
+                            brands: this.brands,
+                            mobile: false,
+                            platform: "Linux",
+                            platformVersion: "6.8.0",
+                            architecture: "x86",
+                            bitness: "64",
+                            model: "",
+                            uaFullVersion: "131.0.0.0",
+                            fullVersionList: this.brands
+                        });
+                    }
+                };
+            }
+        });
+    }
+    // Remove webdriver flag
+    Object.defineProperty(navigator, 'webdriver', {get: () => false});
+})();
+"""
 
 _persistent_profile = None
 
@@ -27,6 +64,15 @@ def get_persistent_profile():
         s.setAttribute(QWebEngineSettings.FocusOnNavigationEnabled, True)
         s.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
         s.setAttribute(QWebEngineSettings.AllowGeolocationOnInsecureOrigins, True)
+
+        # Inject spoof script on every page load
+        script = QWebEngineScript()
+        script.setName("SpoofNavigator")
+        script.setSourceCode(SPOOF_JS)
+        script.setInjectionPoint(QWebEngineScript.DocumentCreation)
+        script.setWorldId(QWebEngineScript.MainWorld)
+        script.setRunsOnSubFrames(True)
+        _persistent_profile.scripts().insert(script)
         
     return _persistent_profile
 
@@ -39,6 +85,15 @@ class WebView(QWebEngineView):
         self.setPage(page)
         
         self.setUrl(QUrl("https://www.google.com"))
+
+    def createWindow(self, window_type):
+        """Handle popup windows (needed for Google login flow)."""
+        new_view = WebView()
+        new_view.setAttribute(5, True)  # WA_DeleteOnClose
+        new_view.setWindowTitle("Login")
+        new_view.resize(800, 600)
+        new_view.show()
+        return new_view
 
     def contextMenuEvent(self, event):
         menu = self.createStandardContextMenu()

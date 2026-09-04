@@ -34,7 +34,7 @@ class TitleBar(QWidget):
         self.layout.addWidget(self.min_btn)
         self.layout.addWidget(self.max_btn)
         
-        self.title = QLabel("Zen Browser")
+        self.title = QLabel("LockBrowser@Octaoss")
         self.title.setStyleSheet("color: #888; font-size: 12px;")
         self.title.setAlignment(Qt.AlignCenter)
         

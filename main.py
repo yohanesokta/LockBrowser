@@ -1,9 +1,17 @@
 import sys
+import os
 from PySide6.QtWidgets import QApplication, QDialog
 from src.crypto_utils import check_auth_integrity, encrypt_and_unmount_profile
 from src.auth import AuthDialog
 
 def main():
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+        "--disable-features=CrossOriginOpenerPolicyReporting"
+        ",SameSiteByDefaultCookies"
+        ",CookiesWithoutSameSiteMustBeSecure"
+        " --disable-site-isolation-trials"
+        " --allow-running-insecure-content"
+    )
     app = QApplication(sys.argv)
     
     status = check_auth_integrity()

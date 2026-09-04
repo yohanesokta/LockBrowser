@@ -140,11 +140,11 @@ class Sidebar(QWidget):
 
     def _update_pin_icon(self):
         if self.is_pinned:
-            self.pin_btn.setText("P")
-            self.pin_btn.setStyleSheet("font-size: 12px; font-weight: bold; color: #27c93f;")
+            self.pin_btn.setText("📌")
+            self.pin_btn.setStyleSheet("font-size: 14px; border: none;")
         else:
-            self.pin_btn.setText("P")
-            self.pin_btn.setStyleSheet("font-size: 12px; font-weight: bold; color: #ff5f56;")
+            self.pin_btn.setText("📌")
+            self.pin_btn.setStyleSheet("font-size: 14px; border: none; opacity: 0.5; color: #ff5f56;")
 
     def toggle_pin(self):
         self.is_pinned = not self.is_pinned
